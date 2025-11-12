@@ -1,8 +1,13 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
 from django.db.models import Count, Avg, Q
-from proyectos.models import Proyecto
+from django.views.generic import CreateView, UpdateView, DeleteView
+from django.urls import reverse_lazy
+from proyectos.models import Proyecto, CuadroControl
 from actividades.models import Actividad
 from noc.models import NoConformidad
+from empresas.models import Empresa
+from users.models import User
 
 
 def dashboard(request):
@@ -211,3 +216,341 @@ def actividades_lista(request):
         'chart_data': chart_data,
     }
     return render(request, "dashboard/actividades_lista.html", context)
+
+
+# ==================== CRUD PROYECTOS ====================
+
+def proyecto_crear(request):
+    """Crear nuevo proyecto"""
+    if request.method == 'POST':
+        try:
+            proyecto = Proyecto.objects.create(
+                codigo=request.POST['codigo'],
+                nombre=request.POST['nombre'],
+                cliente_id=request.POST['cliente'],
+                responsable_id=request.POST['responsable'],
+                supervisor=request.POST.get('supervisor', ''),
+                fecha_inicio=request.POST['fecha_inicio'],
+                fecha_termino=request.POST.get('fecha_termino') or None,
+                estado=request.POST['estado']
+            )
+            # Crear cuadro de control
+            CuadroControl.objects.create(proyecto=proyecto)
+            messages.success(request, f'Proyecto {proyecto.codigo} creado exitosamente.')
+            return redirect('dashboard:proyecto_detalle', proyecto_id=proyecto.id)
+        except Exception as e:
+            messages.error(request, f'Error al crear proyecto: {e}')
+    
+    empresas = Empresa.objects.all()
+    usuarios = User.objects.filter(is_active=True)
+    context = {
+        'empresas': empresas,
+        'usuarios': usuarios,
+        'estados': Proyecto.ESTADO_CHOICES,
+    }
+    return render(request, 'dashboard/proyecto_form.html', context)
+
+
+def proyecto_editar(request, proyecto_id):
+    """Editar proyecto existente"""
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    
+    if request.method == 'POST':
+        try:
+            proyecto.codigo = request.POST['codigo']
+            proyecto.nombre = request.POST['nombre']
+            proyecto.cliente_id = request.POST['cliente']
+            proyecto.responsable_id = request.POST['responsable']
+            proyecto.supervisor = request.POST.get('supervisor', '')
+            proyecto.fecha_inicio = request.POST['fecha_inicio']
+            proyecto.fecha_termino = request.POST.get('fecha_termino') or None
+            proyecto.estado = request.POST['estado']
+            proyecto.save()
+            messages.success(request, f'Proyecto {proyecto.codigo} actualizado exitosamente.')
+            return redirect('dashboard:proyecto_detalle', proyecto_id=proyecto.id)
+        except Exception as e:
+            messages.error(request, f'Error al actualizar proyecto: {e}')
+    
+    empresas = Empresa.objects.all()
+    usuarios = User.objects.filter(is_active=True)
+    context = {
+        'proyecto': proyecto,
+        'empresas': empresas,
+        'usuarios': usuarios,
+        'estados': Proyecto.ESTADO_CHOICES,
+    }
+    return render(request, 'dashboard/proyecto_form.html', context)
+
+
+def proyecto_eliminar(request, proyecto_id):
+    """Eliminar proyecto"""
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    
+    if request.method == 'POST':
+        codigo = proyecto.codigo
+        proyecto.delete()
+        messages.success(request, f'Proyecto {codigo} eliminado exitosamente.')
+        return redirect('dashboard:proyectos_lista')
+    
+    context = {'proyecto': proyecto}
+    return render(request, 'dashboard/proyecto_confirm_delete.html', context)
+
+
+# ==================== CRUD ACTIVIDADES ====================
+
+def actividad_crear(request, proyecto_id=None):
+    """Crear nueva actividad"""
+    if request.method == 'POST':
+        try:
+            actividad = Actividad.objects.create(
+                proyecto_id=request.POST['proyecto'],
+                item=request.POST.get('item', ''),
+                descripcion=request.POST['descripcion'],
+                responsable_id=request.POST.get('responsable') or None,
+                fecha_programada=request.POST.get('fecha_programada') or None,
+                fecha_real=request.POST.get('fecha_real') or None,
+                avance=request.POST.get('avance', 0),
+                estado=request.POST['estado'],
+                observaciones=request.POST.get('observaciones', '')
+            )
+            # Actualizar cuadro de control
+            if hasattr(actividad.proyecto, 'control'):
+                actividad.proyecto.control.actualizar()
+            
+            messages.success(request, 'Actividad creada exitosamente.')
+            return redirect('dashboard:proyecto_detalle', proyecto_id=actividad.proyecto.id)
+        except Exception as e:
+            messages.error(request, f'Error al crear actividad: {e}')
+    
+    proyectos = Proyecto.objects.all()
+    usuarios = User.objects.filter(is_active=True)
+    proyecto_seleccionado = None
+    if proyecto_id:
+        proyecto_seleccionado = get_object_or_404(Proyecto, id=proyecto_id)
+    
+    context = {
+        'proyectos': proyectos,
+        'usuarios': usuarios,
+        'estados': Actividad.ESTADO_CHOICES,
+        'proyecto_seleccionado': proyecto_seleccionado,
+    }
+    return render(request, 'dashboard/actividad_form.html', context)
+
+
+def actividad_editar(request, actividad_id):
+    """Editar actividad existente"""
+    actividad = get_object_or_404(Actividad, id=actividad_id)
+    
+    if request.method == 'POST':
+        try:
+            actividad.proyecto_id = request.POST['proyecto']
+            actividad.item = request.POST.get('item', '')
+            actividad.descripcion = request.POST['descripcion']
+            actividad.responsable_id = request.POST.get('responsable') or None
+            actividad.fecha_programada = request.POST.get('fecha_programada') or None
+            actividad.fecha_real = request.POST.get('fecha_real') or None
+            actividad.avance = request.POST.get('avance', 0)
+            actividad.estado = request.POST['estado']
+            actividad.observaciones = request.POST.get('observaciones', '')
+            actividad.save()
+            
+            # Actualizar cuadro de control
+            if hasattr(actividad.proyecto, 'control'):
+                actividad.proyecto.control.actualizar()
+            
+            messages.success(request, 'Actividad actualizada exitosamente.')
+            return redirect('dashboard:proyecto_detalle', proyecto_id=actividad.proyecto.id)
+        except Exception as e:
+            messages.error(request, f'Error al actualizar actividad: {e}')
+    
+    proyectos = Proyecto.objects.all()
+    usuarios = User.objects.filter(is_active=True)
+    context = {
+        'actividad': actividad,
+        'proyectos': proyectos,
+        'usuarios': usuarios,
+        'estados': Actividad.ESTADO_CHOICES,
+    }
+    return render(request, 'dashboard/actividad_form.html', context)
+
+
+def actividad_eliminar(request, actividad_id):
+    """Eliminar actividad"""
+    actividad = get_object_or_404(Actividad, id=actividad_id)
+    proyecto_id = actividad.proyecto.id
+    
+    if request.method == 'POST':
+        actividad.delete()
+        # Actualizar cuadro de control
+        proyecto = Proyecto.objects.get(id=proyecto_id)
+        if hasattr(proyecto, 'control'):
+            proyecto.control.actualizar()
+        
+        messages.success(request, 'Actividad eliminada exitosamente.')
+        return redirect('dashboard:proyecto_detalle', proyecto_id=proyecto_id)
+    
+    context = {'actividad': actividad}
+    return render(request, 'dashboard/actividad_confirm_delete.html', context)
+
+
+# ==================== CRUD EMPRESAS ====================
+
+def empresa_crear(request):
+    """Crear nueva empresa"""
+    if request.method == 'POST':
+        try:
+            empresa = Empresa.objects.create(
+                nombre=request.POST['nombre'],
+                rut=request.POST.get('rut', ''),
+                contacto=request.POST.get('contacto', ''),
+                correo=request.POST.get('correo', '')
+            )
+            messages.success(request, f'Empresa {empresa.nombre} creada exitosamente.')
+            return redirect('dashboard:empresas_lista')
+        except Exception as e:
+            messages.error(request, f'Error al crear empresa: {e}')
+    
+    return render(request, 'dashboard/empresa_form.html')
+
+
+def empresa_editar(request, empresa_id):
+    """Editar empresa existente"""
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    
+    if request.method == 'POST':
+        try:
+            empresa.nombre = request.POST['nombre']
+            empresa.rut = request.POST.get('rut', '')
+            empresa.contacto = request.POST.get('contacto', '')
+            empresa.correo = request.POST.get('correo', '')
+            empresa.save()
+            messages.success(request, f'Empresa {empresa.nombre} actualizada exitosamente.')
+            return redirect('dashboard:empresas_lista')
+        except Exception as e:
+            messages.error(request, f'Error al actualizar empresa: {e}')
+    
+    context = {'empresa': empresa}
+    return render(request, 'dashboard/empresa_form.html', context)
+
+
+def empresa_eliminar(request, empresa_id):
+    """Eliminar empresa"""
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    
+    if request.method == 'POST':
+        nombre = empresa.nombre
+        empresa.delete()
+        messages.success(request, f'Empresa {nombre} eliminada exitosamente.')
+        return redirect('dashboard:empresas_lista')
+    
+    context = {'empresa': empresa}
+    return render(request, 'dashboard/empresa_confirm_delete.html', context)
+
+
+def empresas_lista(request):
+    """Lista de empresas"""
+    search = request.GET.get('search', '')
+    empresas = Empresa.objects.all()
+    
+    if search:
+        empresas = empresas.filter(
+            Q(nombre__icontains=search) | 
+            Q(rut__icontains=search)
+        )
+    
+    # Agregar conteo de proyectos por empresa
+    empresas_data = []
+    for empresa in empresas:
+        empresas_data.append({
+            'empresa': empresa,
+            'total_proyectos': empresa.proyectos.count(),
+            'proyectos_activos': empresa.proyectos.filter(estado='en_ejecucion').count(),
+        })
+    
+    context = {
+        'empresas_data': empresas_data,
+        'search': search,
+    }
+    return render(request, 'dashboard/empresas_lista.html', context)
+
+
+# ==================== CRUD NOC ====================
+
+def noc_crear(request, proyecto_id=None):
+    """Crear nueva no conformidad"""
+    if request.method == 'POST':
+        try:
+            noc = NoConformidad.objects.create(
+                proyecto_id=request.POST['proyecto'],
+                codigo=request.POST['codigo'],
+                descripcion=request.POST['descripcion'],
+                responsable_id=request.POST.get('responsable') or None,
+                fecha_detectada=request.POST['fecha_detectada'],
+                fecha_cierre=request.POST.get('fecha_cierre') or None,
+                estado=request.POST['estado'],
+                accion_correctiva=request.POST.get('accion_correctiva', '')
+            )
+            messages.success(request, f'NOC {noc.codigo} creada exitosamente.')
+            return redirect('dashboard:proyecto_detalle', proyecto_id=noc.proyecto.id)
+        except Exception as e:
+            messages.error(request, f'Error al crear NOC: {e}')
+    
+    proyectos = Proyecto.objects.all()
+    usuarios = User.objects.filter(is_active=True)
+    proyecto_seleccionado = None
+    if proyecto_id:
+        proyecto_seleccionado = get_object_or_404(Proyecto, id=proyecto_id)
+    
+    context = {
+        'proyectos': proyectos,
+        'usuarios': usuarios,
+        'estados': NoConformidad.ESTADO_CHOICES,
+        'proyecto_seleccionado': proyecto_seleccionado,
+    }
+    return render(request, 'dashboard/noc_form.html', context)
+
+
+def noc_editar(request, noc_id):
+    """Editar no conformidad existente"""
+    noc = get_object_or_404(NoConformidad, id=noc_id)
+    
+    if request.method == 'POST':
+        try:
+            noc.proyecto_id = request.POST['proyecto']
+            noc.codigo = request.POST['codigo']
+            noc.descripcion = request.POST['descripcion']
+            noc.responsable_id = request.POST.get('responsable') or None
+            noc.fecha_detectada = request.POST['fecha_detectada']
+            noc.fecha_cierre = request.POST.get('fecha_cierre') or None
+            noc.estado = request.POST['estado']
+            noc.accion_correctiva = request.POST.get('accion_correctiva', '')
+            noc.save()
+            messages.success(request, f'NOC {noc.codigo} actualizada exitosamente.')
+            return redirect('dashboard:proyecto_detalle', proyecto_id=noc.proyecto.id)
+        except Exception as e:
+            messages.error(request, f'Error al actualizar NOC: {e}')
+    
+    proyectos = Proyecto.objects.all()
+    usuarios = User.objects.filter(is_active=True)
+    context = {
+        'noc': noc,
+        'proyectos': proyectos,
+        'usuarios': usuarios,
+        'estados': NoConformidad.ESTADO_CHOICES,
+    }
+    return render(request, 'dashboard/noc_form.html', context)
+
+
+def noc_eliminar(request, noc_id):
+    """Eliminar no conformidad"""
+    noc = get_object_or_404(NoConformidad, id=noc_id)
+    proyecto_id = noc.proyecto.id
+    
+    if request.method == 'POST':
+        codigo = noc.codigo
+        noc.delete()
+        messages.success(request, f'NOC {codigo} eliminada exitosamente.')
+        return redirect('dashboard:proyecto_detalle', proyecto_id=proyecto_id)
+    
+    context = {'noc': noc}
+    return render(request, 'dashboard/noc_confirm_delete.html', context)

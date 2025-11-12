@@ -7,10 +7,25 @@
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>{{ proyecto.codigo }} - {{ proyecto.nombre }}</h2>
-    <div>
-      <a href="{% url 'dashboard:proyectos_lista' %}" class="btn btn-secondary">← Volver a Lista</a>
-      <a href="{% url 'dashboard:dashboard' %}" class="btn btn-outline-secondary">Dashboard</a>
+    <div class="btn-group">
+      <a href="{% url 'dashboard:proyecto_editar' proyecto.id %}" class="btn btn-warning">
+        <i class="bi bi-pencil"></i> Editar
+      </a>
+      <a href="{% url 'dashboard:actividad_crear_proyecto' proyecto.id %}" class="btn btn-success">
+        <i class="bi bi-plus"></i> Nueva Actividad
+      </a>
+      <a href="{% url 'dashboard:noc_crear_proyecto' proyecto.id %}" class="btn btn-info">
+        <i class="bi bi-exclamation-triangle"></i> Nueva NOC
+      </a>
+      <a href="{% url 'dashboard:proyecto_eliminar' proyecto.id %}" class="btn btn-danger">
+        <i class="bi bi-trash"></i> Eliminar
+      </a>
     </div>
+  </div>
+  
+  <div class="mb-3">
+    <a href="{% url 'dashboard:proyectos_lista' %}" class="btn btn-secondary btn-sm">← Volver a Lista</a>
+    <a href="{% url 'dashboard:dashboard' %}" class="btn btn-outline-secondary btn-sm">Dashboard</a>
   </div>
 
   <!-- Información del Proyecto -->
