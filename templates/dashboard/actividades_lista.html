@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Actividades - EDP{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Lista de Actividades</h2>
+    <a href="{% url 'dashboard:dashboard' %}" class="btn btn-secondary">← Volver al Dashboard</a>
+  </div>
+
+  <!-- Estadísticas Generales -->
+  <div class="row text-center mb-4">
+    <div class="col-md-2">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">Total</h6>
+        <h4 class="text-primary">{{ total_actividades }}</h4>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">Completadas</h6>
+        <h4 class="text-success">{{ completadas }}</h4>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">En Ejecución</h6>
+        <h4 class="text-info">{{ en_ejecucion }}</h4>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">Pendientes</h6>
+        <h4 class="text-warning">{{ pendientes }}</h4>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">Atrasadas</h6>
+        <h4 class="text-danger">{{ atrasadas }}</h4>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">Avance Promedio</h6>
+        <h4>{{ avance_promedio }}%</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="text-center mb-3">Distribución de Actividades por Estado</h5>
+      <div style="position: relative; height: 300px;">
+        <canvas id="chartActividades"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Buscar</label>
+          <input type="text" name="search" class="form-control" placeholder="Item, descripción..." value="{{ search }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Estado</label>
+          <select name="estado" class="form-select">
+            <option value="">Todos</option>
+            {% for value, label in estados %}
+              <option value="{{ value }}" {% if estado_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Proyecto</label>
+          <select name="proyecto" class="form-select">
+            <option value="">Todos</option>
+            {% for proyecto in proyectos %}
+              <option value="{{ proyecto.id }}" {% if proyecto_filter == proyecto.id|stringformat:"s" %}selected{% endif %}>
+                {{ proyecto.codigo }} - {{ proyecto.nombre|truncatewords:5 }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary me-2">Filtrar</button>
+          <a href="{% url 'dashboard:actividades_lista' %}" class="btn btn-outline-secondary">Limpiar</a>
+        </div>
+      </form>
+      <p class="text-muted mt-2 mb-0">Mostrando {{ total_filtradas }} actividades</p>
+    </div>
+  </div>
+
+  <!-- Tabla de Actividades -->
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Proyecto</th>
+              <th>Item</th>
+              <th>Descripción</th>
+              <th>Responsable</th>
+              <th>Fecha Programada</th>
+              <th>Fecha Real</th>
+              <th>Avance</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for actividad in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'dashboard:proyecto_detalle' actividad.proyecto.id %}" class="text-decoration-none">
+                  <strong>{{ actividad.proyecto.codigo }}</strong>
+                </a>
+              </td>
+              <td>{{ actividad.item|default:"-" }}</td>
+              <td>{{ actividad.descripcion|truncatewords:15 }}</td>
+              <td>{{ actividad.responsable.username|default:"-" }}</td>
+              <td>{{ actividad.fecha_programada|date:"d/m/Y"|default:"-" }}</td>
+              <td>{{ actividad.fecha_real|date:"d/m/Y"|default:"-" }}</td>
+              <td>
+                <div class="progress" style="height: 20px; min-width: 80px;">
+                  <div class="progress-bar {% if actividad.avance == 100 %}bg-success{% elif actividad.avance > 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                       role="progressbar" style="width: {{ actividad.avance }}%;">
+                    {{ actividad.avance }}%
+                  </div>
+                </div>
+              </td>
+              <td>
+                {% if actividad.estado == 'completada' %}
+                  <span class="badge bg-success">Completada</span>
+                {% elif actividad.estado == 'en_ejecucion' %}
+                  <span class="badge bg-info">En Ejecución</span>
+                {% elif actividad.estado == 'atrasada' %}
+                  <span class="badge bg-danger">Atrasada</span>
+                {% else %}
+                  <span class="badge bg-secondary">Pendiente</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center">No se encontraron actividades con los filtros seleccionados.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginación -->
+      {% if page_obj.has_other_pages %}
+      <nav aria-label="Paginación de actividades" class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page=1{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if proyecto_filter %}&proyecto={{ proyecto_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Primera</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if proyecto_filter %}&proyecto={{ proyecto_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Anterior</a>
+            </li>
+          {% endif %}
+
+          {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+              <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if proyecto_filter %}&proyecto={{ proyecto_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if proyecto_filter %}&proyecto={{ proyecto_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Siguiente</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if proyecto_filter %}&proyecto={{ proyecto_filter }}{% endif %}{% if search %}&search={{ search }}{% endif %}">Última</a>
+            </li>
+          {% endif %}
+        </ul>
+        <p class="text-center text-muted">
+          Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+        </p>
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Gráfico de distribución
+const ctx = document.getElementById('chartActividades');
+new Chart(ctx, {
+  type: 'doughnut',
+  data: {
+    labels: {{ chart_data.labels|safe }},
+    datasets: [{
+      data: {{ chart_data.values|safe }},
+      backgroundColor: {{ chart_data.colors|safe }},
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 2,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 15,
+          font: {
+            size: 14
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+{% endblock %}

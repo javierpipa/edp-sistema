@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - EDP{% endblock %}
+
+{% block extra_css %}
+<style>
+.card-hover {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4 text-center">Panel de Control - Ejecución de Proyectos (EDP)</h2>
+
+  <div class="row text-center mb-4">
+    <div class="col-md-3">
+      <a href="{% url 'dashboard:proyectos_lista' %}" class="text-decoration-none">
+        <div class="card shadow-sm p-3 card-hover">
+          <h6 class="text-muted">Total Proyectos</h6>
+          <h3 class="text-primary">{{ total_proyectos }}</h3>
+          <small class="text-muted">Ver todos →</small>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{% url 'dashboard:proyectos_lista' %}?estado=en_ejecucion" class="text-decoration-none">
+        <div class="card shadow-sm p-3 card-hover">
+          <h6 class="text-muted">En Ejecución</h6>
+          <h3 class="text-info">{{ proyectos_activos }}</h3>
+          <small class="text-muted">Ver activos →</small>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{% url 'dashboard:proyectos_lista' %}?estado=finalizado" class="text-decoration-none">
+        <div class="card shadow-sm p-3 card-hover">
+          <h6 class="text-muted">Finalizados</h6>
+          <h3 class="text-success">{{ proyectos_finalizados }}</h3>
+          <small class="text-muted">Ver finalizados →</small>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">Avance Promedio</h6>
+        <h3 class="text-warning">{{ avance_promedio }}%</h3>
+      </div>
+    </div>
+  </div>
+
+  <div class="row text-center mb-4">
+    <div class="col-md-4">
+      <a href="{% url 'dashboard:actividades_lista' %}" class="text-decoration-none">
+        <div class="card shadow-sm p-3 card-hover">
+          <h6 class="text-muted">Actividades Totales</h6>
+          <h3 class="text-primary">{{ total_actividades }}</h3>
+          <small class="text-muted">Ver todas →</small>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a href="{% url 'dashboard:actividades_lista' %}?estado=completada" class="text-decoration-none">
+        <div class="card shadow-sm p-3 card-hover">
+          <h6 class="text-muted">Completadas</h6>
+          <h3 class="text-success">{{ completadas }}</h3>
+          <small class="text-muted">Ver completadas →</small>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm p-3">
+        <h6 class="text-muted">No Conformidades</h6>
+        <small>Abiertas: <strong class="text-danger">{{ noc_abiertas }}</strong> | En proceso: <strong class="text-warning">{{ noc_proceso }}</strong> | Cerradas: <strong class="text-success">{{ noc_cerradas }}</strong></small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 shadow-sm">
+    <h5 class="text-center mb-3">Avance Global por Proyecto</h5>
+    <canvas id="chartAvance" height="100"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('chartAvance');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: {{ chart.labels|safe }},
+    datasets: [{
+      label: 'Avance (%)',
+      data: {{ chart.values|safe }},
+      backgroundColor: '#007bff',
+      borderRadius: 5
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, max: 100 }
+    }
+  }
+});
+</script>
+{% endblock %}

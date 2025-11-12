@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ proyecto.codigo }} - Detalle{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ proyecto.codigo }} - {{ proyecto.nombre }}</h2>
+    <div>
+      <a href="{% url 'dashboard:proyectos_lista' %}" class="btn btn-secondary">← Volver a Lista</a>
+      <a href="{% url 'dashboard:dashboard' %}" class="btn btn-outline-secondary">Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Información del Proyecto -->
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Información del Proyecto</h5>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <p><strong>Código:</strong> {{ proyecto.codigo }}</p>
+          <p><strong>Nombre:</strong> {{ proyecto.nombre }}</p>
+          <p><strong>Cliente:</strong> {{ proyecto.cliente.nombre }}</p>
+          <p><strong>Responsable:</strong> {{ proyecto.responsable.get_full_name|default:proyecto.responsable.username }}</p>
+        </div>
+        <div class="col-md-6">
+          <p><strong>Supervisor:</strong> {{ proyecto.supervisor|default:"No asignado" }}</p>
+          <p><strong>Fecha Inicio:</strong> {{ proyecto.fecha_inicio|date:"d/m/Y" }}</p>
+          <p><strong>Fecha Término:</strong> {{ proyecto.fecha_termino|date:"d/m/Y"|default:"No definida" }}</p>
+          <p><strong>Estado:</strong> 
+            {% if proyecto.estado == 'en_ejecucion' %}
+              <span class="badge bg-info">En Ejecución</span>
+            {% elif proyecto.estado == 'finalizado' %}
+              <span class="badge bg-success">Finalizado</span>
+            {% elif proyecto.estado == 'suspendido' %}
+              <span class="badge bg-danger">Suspendido</span>
+            {% else %}
+              <span class="badge bg-secondary">Planificado</span>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+      
+      <!-- Avance Global -->
+      <div class="mt-3">
+        <h6>Avance Global del Proyecto</h6>
+        <div class="progress" style="height: 30px;">
+          <div class="progress-bar bg-success" role="progressbar" 
+               style="width: {{ proyecto.control.avance_global }}%;" 
+               aria-valuenow="{{ proyecto.control.avance_global }}" 
+               aria-valuemin="0" aria-valuemax="100">
+            {{ proyecto.control.avance_global }}%
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estadísticas -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Actividades por Estado</h5>
+        </div>
+        <div class="card-body">
+          <div style="position: relative; height: 300px;">
+            <canvas id="chartActividades"></canvas>
+          </div>
+          <div class="row text-center mt-3">
+            <div class="col-3">
+              <small>Completadas</small><br>
+              <strong class="text-success">{{ act_completadas }}</strong>
+            </div>
+            <div class="col-3">
+              <small>En Ejecución</small><br>
+              <strong class="text-info">{{ act_en_ejecucion }}</strong>
+            </div>
+            <div class="col-3">
+              <small>Pendientes</small><br>
+              <strong class="text-warning">{{ act_pendientes }}</strong>
+            </div>
+            <div class="col-3">
+              <small>Atrasadas</small><br>
+              <strong class="text-danger">{{ act_atrasadas }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">No Conformidades por Estado</h5>
+        </div>
+        <div class="card-body">
+          <div style="position: relative; height: 300px;">
+            <canvas id="chartNOC"></canvas>
+          </div>
+          <div class="row text-center mt-3">
+            <div class="col-4">
+              <small>Abiertas</small><br>
+              <strong class="text-danger">{{ noc_abiertas }}</strong>
+            </div>
+            <div class="col-4">
+              <small>En Proceso</small><br>
+              <strong class="text-warning">{{ noc_proceso }}</strong>
+            </div>
+            <div class="col-4">
+              <small>Cerradas</small><br>
+              <strong class="text-success">{{ noc_cerradas }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actividades Recientes -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Actividades Recientes (últimas 20)</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Descripción</th>
+              <th>Responsable</th>
+              <th>Fecha Programada</th>
+              <th>Avance</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for actividad in actividades %}
+            <tr>
+              <td>{{ actividad.item|default:"-" }}</td>
+              <td>{{ actividad.descripcion|truncatewords:10 }}</td>
+              <td>{{ actividad.responsable.username|default:"-" }}</td>
+              <td>{{ actividad.fecha_programada|date:"d/m/Y"|default:"-" }}</td>
+              <td>
+                <div class="progress" style="height: 20px; min-width: 80px;">
+                  <div class="progress-bar" role="progressbar" 
+                       style="width: {{ actividad.avance }}%;">
+                    {{ actividad.avance }}%
+                  </div>
+                </div>
+              </td>
+              <td>
+                {% if actividad.estado == 'completada' %}
+                  <span class="badge bg-success">Completada</span>
+                {% elif actividad.estado == 'en_ejecucion' %}
+                  <span class="badge bg-info">En Ejecución</span>
+                {% elif actividad.estado == 'atrasada' %}
+                  <span class="badge bg-danger">Atrasada</span>
+                {% else %}
+                  <span class="badge bg-secondary">Pendiente</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center">No hay actividades registradas</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted mt-2">Total de actividades: {{ total_actividades }}</p>
+    </div>
+  </div>
+
+  <!-- No Conformidades Recientes -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">No Conformidades Recientes (últimas 10)</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th>Responsable</th>
+              <th>Fecha Detectada</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for noc in nocs %}
+            <tr>
+              <td><strong>{{ noc.codigo }}</strong></td>
+              <td>{{ noc.descripcion|truncatewords:15 }}</td>
+              <td>{{ noc.responsable.username|default:"-" }}</td>
+              <td>{{ noc.fecha_detectada|date:"d/m/Y" }}</td>
+              <td>
+                {% if noc.estado == 'cerrada' %}
+                  <span class="badge bg-success">Cerrada</span>
+                {% elif noc.estado == 'en_proceso' %}
+                  <span class="badge bg-warning">En Proceso</span>
+                {% else %}
+                  <span class="badge bg-danger">Abierta</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center">No hay no conformidades registradas</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted mt-2">Total de NOC: {{ total_noc }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Gráfico de Actividades
+const ctxAct = document.getElementById('chartActividades');
+new Chart(ctxAct, {
+  type: 'doughnut',
+  data: {
+    labels: {{ chart_actividades.labels|safe }},
+    datasets: [{
+      data: {{ chart_actividades.values|safe }},
+      backgroundColor: {{ chart_actividades.colors|safe }},
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 1,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 15,
+          font: {
+            size: 12
+          }
+        }
+      }
+    }
+  }
+});
+
+// Gráfico de NOC
+const ctxNOC = document.getElementById('chartNOC');
+new Chart(ctxNOC, {
+  type: 'doughnut',
+  data: {
+    labels: {{ chart_noc.labels|safe }},
+    datasets: [{
+      data: {{ chart_noc.values|safe }},
+      backgroundColor: {{ chart_noc.colors|safe }},
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 1,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 15,
+          font: {
+            size: 12
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+{% endblock %}

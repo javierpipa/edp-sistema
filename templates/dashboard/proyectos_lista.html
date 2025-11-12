@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Proyectos - EDP{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Lista de Proyectos</h2>
+    <a href="{% url 'dashboard:dashboard' %}" class="btn btn-secondary">← Volver al Dashboard</a>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Buscar</label>
+          <input type="text" name="search" class="form-control" placeholder="Código, nombre o cliente..." value="{{ search }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Estado</label>
+          <select name="estado" class="form-select">
+            <option value="">Todos</option>
+            {% for value, label in estados %}
+              <option value="{{ value }}" {% if estado_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary me-2">Filtrar</button>
+          <a href="{% url 'dashboard:proyectos_lista' %}" class="btn btn-outline-secondary">Limpiar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lista de proyectos -->
+  <div class="row">
+    {% for data in proyectos_data %}
+    <div class="col-md-6 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">{{ data.proyecto.codigo }}</h5>
+        </div>
+        <div class="card-body">
+          <h6 class="card-title">{{ data.proyecto.nombre }}</h6>
+          <p class="card-text">
+            <strong>Cliente:</strong> {{ data.proyecto.cliente.nombre }}<br>
+            <strong>Responsable:</strong> {{ data.proyecto.responsable.get_full_name|default:data.proyecto.responsable.username }}<br>
+            <strong>Fecha Inicio:</strong> {{ data.proyecto.fecha_inicio|date:"d/m/Y" }}<br>
+            {% if data.proyecto.fecha_termino %}
+            <strong>Fecha Término:</strong> {{ data.proyecto.fecha_termino|date:"d/m/Y" }}<br>
+            {% endif %}
+          </p>
+          
+          <!-- Badge de estado -->
+          {% if data.proyecto.estado == 'en_ejecucion' %}
+            <span class="badge bg-info">En Ejecución</span>
+          {% elif data.proyecto.estado == 'finalizado' %}
+            <span class="badge bg-success">Finalizado</span>
+          {% elif data.proyecto.estado == 'suspendido' %}
+            <span class="badge bg-danger">Suspendido</span>
+          {% else %}
+            <span class="badge bg-secondary">Planificado</span>
+          {% endif %}
+          
+          <!-- Métricas -->
+          <div class="mt-3">
+            <div class="progress mb-2" style="height: 25px;">
+              <div class="progress-bar" role="progressbar" style="width: {{ data.avance_global }}%;" 
+                   aria-valuenow="{{ data.avance_global }}" aria-valuemin="0" aria-valuemax="100">
+                {{ data.avance_global }}%
+              </div>
+            </div>
+            <div class="row text-center">
+              <div class="col-4">
+                <small class="text-muted">Actividades</small><br>
+                <strong>{{ data.actividades_completadas }}/{{ data.total_actividades }}</strong>
+              </div>
+              <div class="col-4">
+                <small class="text-muted">NOC Abiertas</small><br>
+                <strong class="text-danger">{{ data.noc_abiertas }}</strong>
+              </div>
+              <div class="col-4">
+                <small class="text-muted">Total NOC</small><br>
+                <strong>{{ data.total_noc }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'dashboard:proyecto_detalle' data.proyecto.id %}" class="btn btn-primary btn-sm w-100">
+            Ver Detalle →
+          </a>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="alert alert-info">
+        No se encontraron proyectos con los filtros seleccionados.
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
